@@ -1,0 +1,437 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                       String    @id @default(cuid())
+  memberId                 String    @unique
+  name                     String
+  email                    String    @unique
+  emailVerified            DateTime?
+  passwordHash             String?
+  image                    String?
+  bio                      String?
+  city                     String    @default("San Francisco")
+  state                    String    @default("CA")
+  country                  String    @default("US")
+  lat                      Float     @default(37.7749)
+  lon                      Float     @default(-122.4194)
+  birthDate                String?
+  gender                   String?
+  phone                    String?
+  whatsappPhone            String?
+  isNew                    Boolean   @default(false)
+  onboardingCompletedAt    DateTime?
+  groupDraftCompletedAt    DateTime?
+  lookingFor               String    @default("[]")
+  peopleToMeet             String    @default("[]")
+  hangoutStyles            String    @default("[]")
+  relationshipStatus       String    @default("Prefer not to say")
+  industry                 String    @default("Technology & Software")
+  lifeStages               String    @default("[]")
+  showGroups               Boolean   @default(true)
+  showInterests            Boolean   @default(true)
+  relationshipStatusPublic Boolean   @default(true)
+  whoCanContact            String    @default("ANYONE")
+  sendFewerEmails          Boolean   @default(false)
+  turnOffAllEmails         Boolean   @default(false)
+  emailUpdatesConfig       String    @default("{}")
+  socialLinks              String    @default("{}")
+  theme                    String    @default("light")
+  language                 String    @default("en-US")
+  timezone                 String    @default("America/Los_Angeles")
+  isMeetupPlus             Boolean   @default(false)
+  meetupPlusPlan           String?
+  organizerPlan            String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  accounts                 Account[]
+  sessions                 Session[]
+  topics                   UserTopic[]
+  organizedGroups          Group[]             @relation("GroupOrganizer")
+  memberships              GroupMembership[]
+  hostedEvents             Event[]             @relation("EventHost")
+  rsvps                    EventRsvp[]
+  savedEvents              SavedEvent[]
+  uploadedPhotos           Photo[]
+  discussions              Discussion[]
+  discussionComments       DiscussionComment[]
+  reviews                  GroupReview[]
+  sentConnections          Connection[]        @relation("ConnectionRequester")
+  receivedConnections      Connection[]        @relation("ConnectionAddressee")
+  sentMessages             Message[]           @relation("MessageSender")
+  receivedMessages         Message[]           @relation("MessageReceiver")
+  notifications            Notification[]
+  paymentMethods           PaymentMethod[]
+  paymentTransactions      PaymentTransaction[]
+  oauthClientApps          OAuthClientApp[]
+  reports                  ReportSubmission[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model TopicCategory {
+  id         String  @id @default(cuid())
+  categoryId Int     @unique
+  name       String
+  urlkey     String  @unique
+  icon       String
+  color      String  @default("#00798A")
+  topics     Topic[]
+}
+
+model Topic {
+  id             String       @id @default(cuid())
+  topicId        String       @unique
+  name           String
+  urlkey         String       @unique
+  description    String
+  followersCount Int          @default(12500)
+  categoryId     String?
+  category       TopicCategory? @relation(fields: [categoryId], references: [id])
+  userTopics     UserTopic[]
+  groupTopics    GroupTopic[]
+}
+
+model UserTopic {
+  id      String @id @default(cuid())
+  userId  String
+  topicId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+}
+
+model Group {
+  id                String            @id @default(cuid())
+  groupId           String            @unique
+  name              String
+  urlname           String            @unique
+  description       String
+  city              String            @default("San Francisco")
+  state             String            @default("CA")
+  country           String            @default("US")
+  lat               Float             @default(37.7749)
+  lon               Float             @default(-122.4194)
+  isPrivate         Boolean           @default(false)
+  isPro             Boolean           @default(false)
+  proNetworkName    String?
+  rating            Float             @default(4.7)
+  ratingsCount      Int               @default(128)
+  membersCount      Int               @default(1)
+  coverImage        String
+  welcomeMessage    String?
+  duesAmount        Float             @default(0)
+  fundraisingGoal   Float             @default(500)
+  fundraisingRaised Float             @default(185)
+  isDraft           Boolean           @default(false)
+  draftStep         Int               @default(1)
+  organizerId       String
+  organizer         User              @relation("GroupOrganizer", fields: [organizerId], references: [id])
+  createdAt         DateTime          @default(now())
+
+  topics            GroupTopic[]
+  memberships       GroupMembership[]
+  events            Event[]
+  photoAlbums       PhotoAlbum[]
+  discussions       Discussion[]
+  reviews           GroupReview[]
+  transactions      PaymentTransaction[]
+}
+
+model GroupTopic {
+  id      String @id @default(cuid())
+  groupId String
+  topicId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, topicId])
+}
+
+model GroupMembership {
+  id                       String   @id @default(cuid())
+  userId                   String
+  groupId                  String
+  role                     String   @default("MEMBER")
+  status                   String   @default("ACTIVE")
+  groupBio                 String   @default("")
+  emailNotificationsConfig String   @default("{}")
+  joinedAt                 DateTime @default(now())
+  lastVisitedAt            DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model Event {
+  id          String      @id @default(cuid())
+  eventId     String      @unique
+  title       String
+  description String
+  dateTime    DateTime
+  endTime     DateTime
+  timezone    String      @default("PDT")
+  eventType   String      @default("IN_PERSON")
+  venueName   String
+  venueAddress String
+  venueCity   String      @default("San Francisco")
+  venueState  String      @default("CA")
+  lat         Float       @default(37.7858)
+  lon         Float       @default(-122.4364)
+  onlineUrl   String?
+  feeAmount   Float       @default(0)
+  feeCurrency String      @default("USD")
+  maxTickets  Int         @default(100)
+  allowGuests Boolean     @default(true)
+  maxGuests   Int         @default(2)
+  status      String      @default("UPCOMING")
+  coverImage  String
+  seriesText  String?
+  topicsJson  String      @default("[]")
+  groupId     String
+  hostId      String
+  createdAt   DateTime    @default(now())
+
+  group       Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  host        User        @relation("EventHost", fields: [hostId], references: [id])
+  rsvps       EventRsvp[]
+  savedBy     SavedEvent[]
+  photoAlbums PhotoAlbum[]
+  reviews     GroupReview[]
+  transactions PaymentTransaction[]
+}
+
+model EventRsvp {
+  id              String   @id @default(cuid())
+  userId          String
+  eventId         String
+  status          String   @default("YES")
+  guestsCount     Int      @default(0)
+  optToShareEmail Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+}
+
+model SavedEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+}
+
+model PhotoAlbum {
+  id          String   @id @default(cuid())
+  albumId     String   @unique
+  title       String
+  groupId     String
+  eventId     String?
+  photosCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  group  Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  event  Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  photos Photo[]
+}
+
+model Photo {
+  id           String     @id @default(cuid())
+  photoId      String     @unique
+  albumId      String
+  url          String
+  caption      String     @default("")
+  uploadedById String
+  createdAt    DateTime   @default(now())
+
+  album      PhotoAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  uploadedBy User       @relation(fields: [uploadedById], references: [id])
+}
+
+model Discussion {
+  id         String              @id @default(cuid())
+  groupId    String
+  authorId   String
+  title      String
+  body       String
+  isPinned   Boolean             @default(false)
+  likesCount Int                 @default(0)
+  createdAt  DateTime            @default(now())
+
+  group    Group               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author   User                @relation(fields: [authorId], references: [id])
+  comments DiscussionComment[]
+}
+
+model DiscussionComment {
+  id           String     @id @default(cuid())
+  discussionId String
+  authorId     String
+  body         String
+  createdAt    DateTime   @default(now())
+
+  discussion Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  author     User       @relation(fields: [authorId], references: [id])
+}
+
+model GroupReview {
+  id        String   @id @default(cuid())
+  groupId   String
+  authorId  String
+  eventId   String?
+  rating    Int      @default(5)
+  comment   String
+  tags      String   @default("[]")
+  createdAt DateTime @default(now())
+
+  group  Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
+  event  Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+}
+
+model Connection {
+  id          String   @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      String   @default("CONNECTED")
+  createdAt   DateTime @default(now())
+
+  requester User @relation("ConnectionRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("ConnectionAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  body       String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  link      String   @default("/home")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PaymentMethod {
+  id         String   @id @default(cuid())
+  userId     String
+  brand      String   @default("Visa")
+  last4      String
+  expMonth   Int
+  expYear    Int
+  holderName String
+  country    String   @default("US")
+  postalCode String   @default("94102")
+  isDefault  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PaymentTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  groupId     String?
+  eventId     String?
+  type        String
+  direction   String   @default("MADE")
+  description String
+  amount      Float
+  currency    String   @default("USD")
+  status      String   @default("PAID")
+  createdAt   DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+}
+
+model OAuthClientApp {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  websiteUrl   String
+  redirectUri  String
+  clientId     String   @unique
+  clientSecret String
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ReportSubmission {
+  id         String   @id @default(cuid())
+  reporterId String
+  targetType String
+  targetId   String
+  reason     String
+  details    String   @default("")
+  createdAt  DateTime @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+}
