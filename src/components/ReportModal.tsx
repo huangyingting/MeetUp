@@ -1,137 +1,28 @@
-import React, { useState } from 'react';
-import { X, Flag, CheckCircle2 } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { X, Flag, Check } from 'lucide-react';
 import { gqlRequest } from '@/lib/gqlClient';
+import Select from './Select';
 
-interface ReportModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  targetType: 'EVENT' | 'GROUP' | 'MEMBER';
-  targetId: string;
-  targetName: string;
-}
-
-const REPORT_REASONS = [
-  'Spam, scam, or deceptive link',
-  'Hate speech, bullying, or harassment',
-  'Violence, dangerous behavior, or illegal activity',
-  'Nudity or sexually explicit content',
-  'Intellectual property or copyright violation',
-  'Something else',
-];
-
-export default function ReportModal({
-  isOpen,
-  onClose,
-  targetType,
-  targetId,
-  targetName,
-}: ReportModalProps) {
-  const [selectedReason, setSelectedReason] = useState(REPORT_REASONS[0]);
-  const [details, setDetails] = useState('');
+export default function ReportModal({ isOpen, onClose, targetType, targetId, targetName }: {
+  isOpen: boolean; onClose: () => void; targetType: 'EVENT' | 'GROUP' | 'MEMBER'; targetId: string; targetName: string;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await gqlRequest('submitReport', {
-      input: {
-        targetType,
-        targetId,
-        reason: selectedReason,
-        details,
-      },
-    });
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      onClose();
-    }, 1500);
-  };
-
-  return (
-    <div
-      role="dialog"
-      data-state="open"
-      aria-label={`Report ${targetType.toLowerCase()}`}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-ds2-24 shadow-ds2-lg-default max-w-md w-full p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Flag className="w-5 h-5 text-[#E51937]" />
-            <h2 className="ds2-b20 text-gray-900">Why are you reporting this {targetType.toLowerCase()}?</h2>
-          </div>
-          <button onClick={onClose} aria-label="Close" className="p-2 rounded-full hover:bg-gray-100">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {submitted ? (
-          <div className="py-10 text-center space-y-2">
-            <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-            <p className="ds2-b16 text-gray-900">Thank you for your report</p>
-            <p className="ds2-r14 text-gray-500">
-              Our Trust & Safety team will review &ldquo;{targetName}&rdquo; promptly.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-            <div className="space-y-2" role="radiogroup">
-              {REPORT_REASONS.map((reason) => (
-                <label
-                  key={reason}
-                  className={`flex items-center gap-3 p-3 rounded-ds2-12 border cursor-pointer transition ${
-                    selectedReason === reason
-                      ? 'border-gray-900 bg-gray-50'
-                      : 'border-gray-200 hover:border-gray-400'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="reportReason"
-                    checked={selectedReason === reason}
-                    onChange={() => setSelectedReason(reason)}
-                    className="accent-gray-900"
-                  />
-                  <span className="ds2-m14 text-gray-800">{reason}</span>
-                </label>
-              ))}
-            </div>
-
-            <div>
-              <label className="block ds2-m12 text-gray-600 mb-1">Additional details (optional)</label>
-              <textarea
-                rows={2}
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-                placeholder="Share any context that helps our Trust & Safety team..."
-                className="w-full rounded-ds2-12 border border-gray-300 px-3 py-2 ds2-r14 focus:outline-none focus:border-gray-900"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-ds2-max ds2-m14 text-gray-600 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-ds2-max bg-[#E51937] hover:bg-[#c8142f] text-white ds2-b16 transition"
-              >
-                Submit report
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (isOpen) { setError(''); setSubmitted(false); dialog.current?.showModal(); }
+    else dialog.current?.close();
+  }, [isOpen]);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError('');
+    const data = new FormData(event.currentTarget);
+    try { await gqlRequest('submitReport', { input: { targetType, targetId, reason: data.get('reason'), details: data.get('details') } }); setSubmitted(true); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Your report could not be submitted.'); }
+    finally { setBusy(false); }
+  }
+  return <dialog ref={dialog} onCancel={onClose} aria-labelledby="report-title" className="surface p-6 sm:p-8 max-w-lg w-[calc(100%-2rem)] backdrop:bg-black/50">
+    <div className="flex justify-between gap-6 items-start"><div><p className="eyebrow flex gap-2"><Flag size={14} />Community care</p><h2 id="report-title" className="text-2xl font-semibold mt-3">Report a concern.</h2></div><button className="p-2" type="button" aria-label="Close report" onClick={onClose}><X size={19} /></button></div>
+    {submitted ? <div className="space-y-4 mt-8"><Check size={26} /><p role="status">Your report about {targetName} has been recorded for the site operator.</p><p className="text-sm text-[var(--muted)]">For immediate danger, contact local emergency services. Reports are not an emergency response channel.</p><button className="button-primary" onClick={onClose}>Done</button></div> : <form className="mt-7 space-y-5" onSubmit={submit}><div><label className="field-label" id="report-reason-label" htmlFor="report-reason">What happened?</label><Select id="report-reason" name="reason" options={['Spam or misleading content', 'Harassment or discrimination', 'Unsafe behavior', 'Inappropriate content', 'Something else'].map(reason => ({ value: reason, label: reason }))} /></div><div><label className="field-label" htmlFor="report-details">Additional context (optional)</label><textarea id="report-details" name="details" className="field" rows={4} maxLength={5000} /></div>{error && <p className="form-error" role="alert">{error}</p>}<button className="button-primary" disabled={busy}>Submit report</button></form>}
+  </dialog>;
 }

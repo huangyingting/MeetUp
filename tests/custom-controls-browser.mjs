@@ -1,0 +1,130 @@
+import assert from 'node:assert/strict';
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+export async function verifyCustomControls({ browser, base, db, group, userId }) {
+  const key = async name => {
+    const codes = { Tab: 9, Enter: 13, Escape: 27, ' ': 32, End: 35, Home: 36, ArrowUp: 38, ArrowDown: 40 };
+    const event = { key: name, code: name === ' ' ? 'Space' : name.length === 1 ? `Key${name.toUpperCase()}` : name, windowsVirtualKeyCode: codes[name] || name.toUpperCase().charCodeAt(0) };
+    await browser.command('Input.dispatchKeyEvent', { type: 'keyDown', ...event });
+    await browser.command('Input.dispatchKeyEvent', { type: 'keyUp', ...event });
+  };
+  const click = async selector => {
+    const point = await browser.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      element.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    await browser.command('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await browser.command('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
+    await browser.command('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
+  };
+  const screenshot = async name => {
+    if (!process.env.BROWSER_SCREENSHOT_DIRECTORY) return;
+    await browser.evaluate('document.fonts.ready');
+    const { data } = await browser.command('Page.captureScreenshot', { format: 'png' });
+    await writeFile(path.join(process.env.BROWSER_SCREENSHOT_DIRECTORY, name), Buffer.from(data, 'base64'));
+  };
+  const assertNoNativeSelect = async () => assert.equal(await browser.evaluate("document.querySelectorAll('select').length"), 0);
+
+  await browser.go(base + '/find', '#find-type');
+  await assertNoNativeSelect();
+  assert.equal(await browser.evaluate("document.querySelectorAll('[role=\"combobox\"]').length"), 3);
+  await browser.evaluate("document.querySelector('#find-keywords').focus()");
+  assert(await browser.evaluate("getComputedStyle(document.activeElement).outlineStyle === 'none' && getComputedStyle(document.activeElement).boxShadow === 'none'"));
+  await click('#find-type');
+  await browser.wait("document.querySelector('#find-type').getAttribute('aria-expanded') === 'true'");
+  assert(await browser.evaluate("Boolean(document.getElementById(document.querySelector('#find-type').getAttribute('aria-activedescendant')))"));
+  await key('End');
+  await key('Enter');
+  assert.equal(await browser.evaluate("new FormData(document.querySelector('#find-type').form).get('type')"), 'online');
+  assert.equal(await browser.evaluate('document.activeElement.id'), 'find-type');
+  assert.equal(await browser.evaluate("document.querySelectorAll('[role=\"listbox\"]').length"), 0);
+  await key(' ');
+  await browser.wait("document.querySelector('#find-type').getAttribute('aria-expanded') === 'true'");
+  await key('Home');
+  await key('Escape');
+  assert.equal(await browser.evaluate("new FormData(document.querySelector('#find-type').form).get('type')"), 'online', 'Escape must discard the highlighted option');
+  await click('#find-sort');
+  await key('r');
+  await key('Enter');
+  assert.equal(await browser.evaluate("new FormData(document.querySelector('#find-sort').form).get('sort')"), 'newest', 'Typing must find an option by its label');
+  await browser.evaluate("document.querySelector('#find-sort').form.reset()");
+  await browser.wait("document.querySelector('#find-sort').textContent.includes('Soonest first')");
+  assert.equal(await browser.evaluate("new FormData(document.querySelector('#find-type').form).get('type')"), 'all');
+  await click('#find-category');
+  await browser.wait("Boolean(document.querySelector('[role=\"listbox\"]'))");
+  assert(await browser.evaluate("(() => { const rect = document.querySelector('[role=\"listbox\"]').getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight; })()"), 'The popup must remain inside the mobile viewport');
+  await screenshot('custom-select-mobile.png');
+  await browser.evaluate("document.querySelector('h1').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))");
+  await browser.wait("!document.querySelector('[role=\"listbox\"]')");
+  await click('#find-type');
+  await key('Tab');
+  await browser.wait("!document.querySelector('[role=\"listbox\"]')");
+  assert.notEqual(await browser.evaluate('document.activeElement.id'), 'find-type', 'Tab must move to the next control');
+  await click('#find-type');
+  await key('End');
+  await key('Enter');
+  await browser.click('Apply filters');
+  await browser.wait("new URLSearchParams(location.search).get('type') === 'online'");
+  await browser.wait("Boolean(document.querySelector('#find-type'))");
+  assert((await browser.evaluate("document.querySelector('#find-type').textContent")).includes('Online'));
+
+  await browser.go(base + '/start', '#privacy');
+  await assertNoNativeSelect();
+  await browser.fill('#group-name', 'Custom Control Community');
+  await browser.fill('#group-city', 'Portland');
+  await browser.fill('#group-description', 'An isolated community created to check that the custom visibility selector saves the chosen value.');
+  await browser.evaluate("document.querySelector('#group-name').focus()");
+  const focusedField = await browser.evaluate("(() => { const style = getComputedStyle(document.activeElement); return { id: document.activeElement.id, outline: style.outlineStyle, shadow: style.boxShadow, border: style.borderColor }; })()");
+  assert.deepEqual(focusedField, { id: 'group-name', outline: 'none', shadow: 'none', border: 'rgb(32, 77, 59)' });
+  await click('#privacy');
+  await key('End');
+  await key('Enter');
+  assert.equal(await browser.evaluate("new FormData(document.querySelector('#privacy').form).get('privacy')"), 'private');
+  await browser.click('Save draft');
+  await browser.wait("document.querySelector('[role=\"status\"]')?.textContent.includes('Draft saved')");
+  assert.equal((await db.group.findFirst({ where: { name: 'Custom Control Community', organizerId: userId } })).isPrivate, true);
+
+  await browser.go(`${base}/${group.urlname}/events/new`, '#event-format');
+  await assertNoNativeSelect();
+  await click('#event-format');
+  await click('#event-format-option-1');
+  await browser.wait("Boolean(document.querySelector('#event-url')) && !document.querySelector('#event-venue')");
+  await click('#event-format');
+  await key('Home');
+  await key('Enter');
+  await browser.wait("Boolean(document.querySelector('#event-venue')) && !document.querySelector('#event-url')");
+
+  await browser.go(base + '/account/privacy', '#message-privacy');
+  await assertNoNativeSelect();
+  await click('#message-privacy');
+  await key('End');
+  await key('Enter');
+  await browser.click('Save changes');
+  await browser.wait("document.querySelector('[role=\"status\"]')?.textContent.includes('saved')");
+  assert.equal((await db.user.findUnique({ where: { id: userId } })).whoCanContact, 'NOBODY');
+
+  await browser.go(`${base}/${group.urlname}`, 'h1');
+  await browser.click('Report a concern about this community');
+  await browser.wait("Boolean(document.querySelector('dialog[open] #report-reason'))");
+  await assertNoNativeSelect();
+  await click('#report-reason');
+  await browser.wait("Boolean(document.querySelector('#report-reason-listbox'))");
+  assert(await browser.evaluate("Boolean(document.querySelector('#report-reason-listbox').closest('dialog[open]'))"), 'A modal dropdown must stay inside the active dialog');
+  await screenshot('custom-select-dialog.png');
+  await key('Escape');
+  await browser.wait("!document.querySelector('[role=\"listbox\"]')");
+  assert(await browser.evaluate("Boolean(document.querySelector('dialog[open]'))"), 'Escape must close the dropdown before its dialog');
+  await click('#report-reason');
+  await click('#report-reason-option-4');
+  assert.equal(await browser.evaluate("new FormData(document.querySelector('#report-reason').form).get('reason')"), 'Something else');
+  await browser.evaluate("document.querySelector('#report-details').focus()");
+  assert(await browser.evaluate("getComputedStyle(document.activeElement).outlineStyle === 'none' && getComputedStyle(document.activeElement).boxShadow === 'none'"));
+  await browser.click('Submit report');
+  await browser.wait("document.querySelector('dialog[open] [role=\"status\"]')?.textContent.includes('recorded')");
+  assert.equal(await db.reportSubmission.count({ where: { reporterId: userId, reason: 'Something else' } }), 1);
+  assert.deepEqual(browser.errors, [], 'Custom controls must not emit runtime or CSP errors');
+  console.log('PASS custom dropdown keyboard/pointer/typeahead, reset, form persistence, modal layering and single-border input focus');
+}

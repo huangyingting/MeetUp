@@ -7,32 +7,19 @@ export async function getActiveUser(
   req?: NextApiRequest | GetServerSidePropsContext['req'],
   res?: NextApiResponse | GetServerSidePropsContext['res']
 ) {
+  res?.setHeader('Cache-Control', 'private, no-store, max-age=0');
   if (req && res) {
-    try {
-      const session = await getServerSession(req as any, res as any, authOptions);
-      if (session?.user?.email) {
-        const u = await prisma.user.findUnique({
-          where: { email: session.user.email },
-          include: {
-            topics: { include: { topic: true } },
-            memberships: { include: { group: true } },
-          },
-        });
-        if (u) return u;
-      }
-    } catch {
-      // Fallback to cookie or default seeded member
+    const session = await getServerSession(req, res, authOptions);
+    if (session?.user?.id) {
+      return prisma.user.findUnique({
+        where: { id: session.user.id },
+        omit: { passwordHash: true },
+        include: {
+          topics: { include: { topic: true } },
+          memberships: { include: { group: true } },
+        },
+      });
     }
   }
-
-  // Also honor .cred cookies (__meetup_auth_access_token or MEETUP_MEMBER) or default to Member 484670701
-  const defaultUser = await prisma.user.findFirst({
-    where: { memberId: '484670701' },
-    include: {
-      topics: { include: { topic: true } },
-      memberships: { include: { group: true } },
-    },
-  });
-
-  return defaultUser;
+  return null;
 }

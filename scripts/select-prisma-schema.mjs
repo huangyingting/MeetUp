@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +10,7 @@ const sqliteBackupPath = path.join(rootDir, 'prisma', 'schema.sqlite.prisma');
 const postgresBackupPath = path.join(rootDir, 'prisma', 'schema.postgres.prisma');
 
 const argProvider = process.argv[2];
-const envUrl = process.env.DATABASE_URL || '';
+const envUrl = process.env.POSTGRES_DATABASE_URL || process.env.DATABASE_URL || '';
 const targetProvider =
   argProvider === 'postgresql' || argProvider === 'postgres'
     ? 'postgresql'
@@ -23,12 +24,12 @@ const baseSchema = fs.readFileSync(schemaPath, 'utf8');
 
 const sqliteSchema = baseSchema.replace(
   /datasource db \{[\s\S]*?\}/,
-  `datasource db {\n  provider = "sqlite"\n  url      = env("DATABASE_URL")\n}`
+  `datasource db {\n  provider = "sqlite"\n}`
 );
 
 const postgresSchema = baseSchema.replace(
   /datasource db \{[\s\S]*?\}/,
-  `datasource db {\n  provider = "postgresql"\n  url      = env("POSTGRES_DATABASE_URL")\n}`
+  `datasource db {\n  provider = "postgresql"\n}`
 );
 
 fs.writeFileSync(sqliteBackupPath, sqliteSchema, 'utf8');

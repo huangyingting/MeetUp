@@ -2,33 +2,58 @@
   "name": "meetup-clone",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "^22.18.0 || >=24.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "test": "node --experimental-strip-types --test src/lib/backend/*.test.mjs tests/*.test.mjs",
+    "test:integration": "node --experimental-strip-types tests/product-integration.mjs",
+    "test:services": "node tests/services-integration.mjs",
     "db:use:sqlite": "node scripts/select-prisma-schema.mjs sqlite",
     "db:use:postgres": "node scripts/select-prisma-schema.mjs postgresql",
-    "db:push": "prisma db push",
+    "db:push": "prisma db push && prisma generate",
+    "db:deploy": "node scripts/select-prisma-schema.mjs && prisma migrate deploy && prisma generate",
     "db:seed": "node prisma/seed.mjs",
-    "db:setup": "node scripts/select-prisma-schema.mjs sqlite && prisma db push && node prisma/seed.mjs"
+    "db:maintenance": "node scripts/maintenance.mjs",
+    "db:setup": "node scripts/select-prisma-schema.mjs sqlite && npm run db:push && npm run db:seed"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/adapter-better-sqlite3": "7.10.1",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "dotenv": "^17.2.3",
     "lucide-react": "^0.460.0",
-    "next": "^14.2.18",
-    "next-auth": "^4.24.10",
+    "next": "16.4.2",
+    "next-auth": "4.24.15",
+    "nodemailer": "^10.1.7",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/node": "^20.17.6",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.0",
+    "@next/eslint-plugin-next": "16.4.2",
+    "@typescript-eslint/parser": "^8.46.0",
     "postcss": "^8.4.49",
-    "prisma": "^5.22.0",
+    "prisma": "7.10.1",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3"
+  },
+  "overrides": {
+    "next-auth": {
+      "nodemailer": "$nodemailer"
+    }
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
   }
 }

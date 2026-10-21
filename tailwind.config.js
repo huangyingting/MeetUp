@@ -8,28 +8,29 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['NeuSans', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Helvetica', 'Arial', 'sans-serif'],
+        sans: ['Mona Sans', 'Noto Sans SC', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
         viridian: {
-          DEFAULT: '#00798A',
-          dark: '#005D6B',
-          light: '#E6F4F6',
+          DEFAULT: '#204D3B',
+          dark: '#153B2B',
+          light: '#E9EEDF',
         },
         coral: {
-          DEFAULT: '#F65858',
-          hover: '#E04444',
-          brand: '#E51937',
+          DEFAULT: '#B54025',
+          hover: '#97351E',
+          brand: '#B54025',
         },
         peach: '#FFF4ED',
         ds2: {
-          canvas: '#FCFCFD',
-          surface: '#FFFFFF',
-          tertiary: '#F4F4F6',
-          stroke: '#E5E7EB',
-          ink: '#141416',
-          secondary: '#52525B',
-          muted: '#71717A',
+          canvas: '#F5F3ED',
+          surface: '#FFFEF9',
+          tertiary: '#E9ECE1',
+          stroke: '#D8DBCF',
+          ink: '#202922',
+          secondary: '#656B62',
+          muted: '#656B62',
           magenta: '#D91B5C',
           purple: '#7C3AED',
         }
@@ -38,6 +39,7 @@ module.exports = {
         'ds2-6': '6px',
         'ds2-8': '8px',
         'ds2-12': '12px',
+        'ds2-16': '16px',
         'ds2-20': '20px',
         'ds2-24': '24px',
         'ds2-28': '28px',

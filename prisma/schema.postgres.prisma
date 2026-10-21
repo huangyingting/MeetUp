@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("POSTGRES_DATABASE_URL")
 }
 
 model User {
@@ -16,11 +15,11 @@ model User {
   passwordHash             String?
   image                    String?
   bio                      String?
-  city                     String    @default("San Francisco")
-  state                    String    @default("CA")
-  country                  String    @default("US")
-  lat                      Float     @default(37.7749)
-  lon                      Float     @default(-122.4194)
+  city                     String    @default("")
+  state                    String    @default("")
+  country                  String    @default("")
+  lat                      Float     @default(0)
+  lon                      Float     @default(0)
   birthDate                String?
   gender                   String?
   phone                    String?
@@ -32,7 +31,7 @@ model User {
   peopleToMeet             String    @default("[]")
   hangoutStyles            String    @default("[]")
   relationshipStatus       String    @default("Prefer not to say")
-  industry                 String    @default("Technology & Software")
+  industry                 String    @default("")
   lifeStages               String    @default("[]")
   showGroups               Boolean   @default(true)
   showInterests            Boolean   @default(true)
@@ -44,7 +43,7 @@ model User {
   socialLinks              String    @default("{}")
   theme                    String    @default("light")
   language                 String    @default("en-US")
-  timezone                 String    @default("America/Los_Angeles")
+  timezone                 String    @default("UTC")
   isMeetupPlus             Boolean   @default(false)
   meetupPlusPlan           String?
   organizerPlan            String?
@@ -109,6 +108,14 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model ApiRateLimit {
+  id      String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
 model TopicCategory {
   id         String  @id @default(cuid())
   categoryId Int     @unique
@@ -125,7 +132,7 @@ model Topic {
   name           String
   urlkey         String       @unique
   description    String
-  followersCount Int          @default(12500)
+  followersCount Int          @default(0)
   categoryId     String?
   category       TopicCategory? @relation(fields: [categoryId], references: [id])
   userTopics     UserTopic[]
@@ -148,22 +155,22 @@ model Group {
   name              String
   urlname           String            @unique
   description       String
-  city              String            @default("San Francisco")
-  state             String            @default("CA")
-  country           String            @default("US")
-  lat               Float             @default(37.7749)
-  lon               Float             @default(-122.4194)
+  city              String            @default("")
+  state             String            @default("")
+  country           String            @default("")
+  lat               Float             @default(0)
+  lon               Float             @default(0)
   isPrivate         Boolean           @default(false)
   isPro             Boolean           @default(false)
   proNetworkName    String?
-  rating            Float             @default(4.7)
-  ratingsCount      Int               @default(128)
+  rating            Float             @default(0)
+  ratingsCount      Int               @default(0)
   membersCount      Int               @default(1)
   coverImage        String
   welcomeMessage    String?
   duesAmount        Float             @default(0)
-  fundraisingGoal   Float             @default(500)
-  fundraisingRaised Float             @default(185)
+  fundraisingGoal   Float             @default(0)
+  fundraisingRaised Float             @default(0)
   isDraft           Boolean           @default(false)
   draftStep         Int               @default(1)
   organizerId       String
@@ -177,6 +184,9 @@ model Group {
   discussions       Discussion[]
   reviews           GroupReview[]
   transactions      PaymentTransaction[]
+
+  @@index([isDraft, isPrivate, city])
+  @@index([organizerId, isDraft])
 }
 
 model GroupTopic {
@@ -204,6 +214,7 @@ model GroupMembership {
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId])
+  @@index([groupId, status])
 }
 
 model Event {
@@ -213,14 +224,14 @@ model Event {
   description String
   dateTime    DateTime
   endTime     DateTime
-  timezone    String      @default("PDT")
+  timezone    String      @default("UTC")
   eventType   String      @default("IN_PERSON")
   venueName   String
   venueAddress String
-  venueCity   String      @default("San Francisco")
-  venueState  String      @default("CA")
-  lat         Float       @default(37.7858)
-  lon         Float       @default(-122.4364)
+  venueCity   String      @default("")
+  venueState  String      @default("")
+  lat         Float       @default(0)
+  lon         Float       @default(0)
   onlineUrl   String?
   feeAmount   Float       @default(0)
   feeCurrency String      @default("USD")
@@ -242,6 +253,9 @@ model Event {
   photoAlbums PhotoAlbum[]
   reviews     GroupReview[]
   transactions PaymentTransaction[]
+
+  @@index([status, dateTime])
+  @@index([groupId, dateTime])
 }
 
 model EventRsvp {
@@ -258,6 +272,7 @@ model EventRsvp {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventId])
+  @@index([eventId, status])
 }
 
 model SavedEvent {
@@ -363,6 +378,9 @@ model Message {
 
   sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId, isRead, createdAt])
+  @@index([senderId, receiverId, createdAt])
 }
 
 model Notification {
@@ -375,6 +393,8 @@ model Notification {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
 }
 
 model PaymentMethod {
@@ -385,8 +405,8 @@ model PaymentMethod {
   expMonth   Int
   expYear    Int
   holderName String
-  country    String   @default("US")
-  postalCode String   @default("94102")
+  country    String   @default("")
+  postalCode String   @default("")
   isDefault  Boolean  @default(true)
   createdAt  DateTime @default(now())
 
@@ -403,7 +423,7 @@ model PaymentTransaction {
   description String
   amount      Float
   currency    String   @default("USD")
-  status      String   @default("PAID")
+  status      String   @default("PENDING")
   createdAt   DateTime @default(now())
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
